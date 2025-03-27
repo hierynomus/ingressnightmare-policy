@@ -37,9 +37,10 @@ jobs:
 
     - name: Install kwctl
       run: |
-        curl -sSfL https://github.com/kubewarden/kwctl/releases/latest/download/kwctl-linux-x86_64 -o kwctl
-        chmod +x kwctl
-        sudo mv kwctl /usr/local/bin/
+        curl -sSfL https://github.com/kubewarden/kwctl/releases/download/v1.23.0/kwctl-linux-x86_64.zip -o kwctl-linux-x86_64.zip
+        unzip kwctl-linux-x86_64.zip
+        chmod +x kwctl-linux-x86_64
+        sudo mv kwctl-linux-x86_64 /usr/local/bin/kwctl
 
 
     - name: Run test cases
