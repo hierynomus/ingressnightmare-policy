@@ -52,7 +52,7 @@ jobs:
           expect_rejection=$(jq -r '.expect_rejection // false' "$test_case")
           echo "$request" > tmp-request.json
 
-          if kwctl run --request-path tmp-request.json --settings-json "$settings" --policy-path target/${{ env.RUST_TARGET }}/release/policy.wasm > result.json 2>&1; then
+          if kwctl run --request-path tmp-request.json --settings-json "$settings" ./target/${{ env.RUST_TARGET }}/release/ingressnightmare_policy.wasm > result.json 2>&1; then
             if [ "$expect_rejection" = "true" ]; then
               echo "❌ Expected rejection, but policy accepted $test_case"
               cat result.json

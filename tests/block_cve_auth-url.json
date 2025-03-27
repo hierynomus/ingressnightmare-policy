@@ -1,19 +1,33 @@
 {
-    "expected_rejection": "true",
-    "settings": {
-        "allow_config_snippets": "true"
+  "expected_rejection": "true",
+  "settings": {
+    "allowConfigSnippets": true
+  },
+
+  "request": {
+    "uid": "001",
+    "kind": {
+      "group": "networking.k8s.io",
+      "version": "v1",
+      "kind": "Ingress"
     },
-    "request": {
-        "uid": "001",
-        "kind": {"group": "networking.k8s.io", "version": "v1", "kind": "Ingress"},
-        "resource": {"group": "networking.k8s.io", "version": "v1", "resource": "ingresses"},
-        "object": {
-            "kind": "Ingress",
-            "metadata": {
-                "annotations": {
-                    "nginx.ingress.kubernetes.io/auth-url": "http://malicious"
-                }
-            }
+    "operation": "CREATE",
+    "userInfo": {
+      "username": "admin",
+      "groups": ["system:masters"]
+    },
+    "resource": {
+      "group": "networking.k8s.io",
+      "version": "v1",
+      "resource": "ingresses"
+    },
+    "object": {
+      "kind": "Ingress",
+      "metadata": {
+        "annotations": {
+          "nginx.ingress.kubernetes.io/auth-url": "http://malicious"
         }
+      }
     }
+  }
 }

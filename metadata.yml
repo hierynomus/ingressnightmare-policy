@@ -1,0 +1,29 @@
+rules:
+  - apiGroups:
+      - ''
+    apiVersions:
+      - networking/v1
+    resources:
+      - ingress
+    operations:
+      - CREATE
+      - UPDATE
+mutating: false
+contextAware: false
+executionMode: kubewarden-wapc
+annotations:
+  # artifacthub specific
+  io.kubewarden.policy.title: ingressnightmare-policy
+  io.kubewarden.policy.version: 0.1.10
+  io.artifacthub.displayName: IngressNightmare
+  io.artifacthub.resources: Ingress
+  io.artifacthub.keywords: ingress, security, nightmare
+  # kubewarden specific
+  io.kubewarden.policy.description: This policy prevents the creation of Ingress resources that could be used to exploit CVE-2025-1097, CVE-2025-1098, CVE-2025-24513, CVE-2025-24514, and CVE-2025-1974.
+  io.kubewarden.policy.author: Jeroen van Erp <jeroen@geeko.me>
+  io.kubewarden.policy.ociUrl: ghcr.io/hierynomus/policies/ingressnightmare-policy
+  io.kubewarden.policy.url: https://github.com/hierynomus/ingressnightmare-policy
+  io.kubewarden.policy.source: https://github.com/hierynomus/ingressnightmare-policy
+  io.kubewarden.policy.license: Apache-2.0
+  io.kubewarden.policy.severity: critical
+  io.kubewarden.policy.category: Security
