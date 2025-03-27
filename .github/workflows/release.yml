@@ -1,0 +1,43 @@
+name: Release Policy to GHCR
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Install dependencies
+        run: |
+          cargo install cargo-make
+          curl -sSfL https://github.com/kubewarden/kwctl/releases/latest/download/kwctl-linux-x86_64 -o kwctl
+          chmod +x kwctl
+          sudo mv kwctl /usr/local/bin/
+
+      - name: Build policy
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Push to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          IMAGE="ghcr.io/${{ github.repository_owner }}/ingress-snippet-blocker:${VERSION}"
+          kwctl push --destination "$IMAGE" --policy-path target/wasm32-unknown-unknown/release/policy.wasm
