@@ -6,14 +6,8 @@ KubeWarden policy that blocks dangerous `ingress-nginx` annotations associated w
 
 - `nginx.ingress.kubernetes.io/auth-url`
 - `nginx.ingress.kubernetes.io/auth-tls-match-cn`
-- `nginx.ingress.kubernetes.io/mirror`
-- `nginx.ingress.kubernetes.io/permanent-redirect`
-- `nginx.ingress.kubernetes.io/configuration-snippet`
-- `nginx.ingress.kubernetes.io/server-snippet`
-
-## Usage
-
-```sh
-make build test
-kwctl push --destination registry.example.com/ingress-snippet-blocker:v0.2.0 --policy-path target/wasm32-unknown-unknown/release/policy.wasm
-```
+- `nginx.ingress.kubernetes.io/mirror-host`
+- `nginx.ingress.kubernetes.io/mirror-target`
+- `nginx.ingress.kubernetes.io/configuration-snippet` (Optional)
+- `nginx.ingress.kubernetes.io/server-snippet` (Optional)
+- `nginx.ingress.kubernetes.io/auth-snippet` (Optional)

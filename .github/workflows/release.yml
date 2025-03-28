@@ -11,7 +11,7 @@ env:
   REPO: ${{ github.repository_owner }}/kw-policies/ingressnightmare-policy
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -47,11 +47,16 @@ jobs:
         run: cargo build --release --target wasm32-unknown-unknown
 
       - name: Annotate policy
-        run: kwctl annotate -m metadata.yaml -u README.md -o ingressnightmare-policy.wasm target/${{ env.RUST_TARGET }}/release/ingressnightmare_policy.wasm
+        run: kwctl annotate -m metadata.yml -u README.md -o ingressnightmare-policy.wasm target/${{ env.RUST_TARGET }}/release/ingressnightmare_policy.wasm
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
 
       - name: Push to GHCR
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           IMAGE="${{env.REGISTRY}}/${{ env.REPO }}:${VERSION}"
