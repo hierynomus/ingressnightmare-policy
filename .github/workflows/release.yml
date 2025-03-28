@@ -5,39 +5,54 @@ on:
     tags:
       - "v*"
 
+env:
+  RUST_TARGET: wasm32-unknown-unknown
+  REGISTRY: ghcr.io
+  REPO: ${{ github.repository_owner }}/kw-policies/ingressnightmare-policy
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
+    env:
+      K8S_OPENAPI_ENABLED_VERSION: "1.28"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - name: Cache
+        uses: actions/cache@v4
         with:
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install dependencies
+      - name: Install kwctl
         run: |
-          cargo install cargo-make
-          curl -sSfL https://github.com/kubewarden/kwctl/releases/latest/download/kwctl-linux-x86_64 -o kwctl
-          chmod +x kwctl
-          sudo mv kwctl /usr/local/bin/
+          curl -sSfL https://github.com/kubewarden/kwctl/releases/download/v1.23.0/kwctl-linux-x86_64.zip -o kwctl-linux-x86_64.zip
+          unzip kwctl-linux-x86_64.zip
+          chmod +x kwctl-linux-x86_64
+          sudo mv kwctl-linux-x86_64 /usr/local/bin/kwctl
+
+      - name: Add wasm target
+        run: rustup target add ${{ env.RUST_TARGET }}
 
       - name: Build policy
         run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Annotate policy
+        run: kwctl annotate -m metadata.yaml -u README.md -o ingressnightmare-policy.wasm target/${{ env.RUST_TARGET }}/release/ingressnightmare_policy.wasm
 
       - name: Push to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          IMAGE="ghcr.io/${{ github.repository_owner }}/ingress-snippet-blocker:${VERSION}"
-          kwctl push --destination "$IMAGE" --policy-path target/wasm32-unknown-unknown/release/policy.wasm
+          IMAGE="${{env.REGISTRY}}/${{ env.REPO }}:${VERSION}"
+          kwctl push ingressnightmare-policy.wasm registry://$IMAGE
