@@ -44,31 +44,6 @@ jobs:
         chmod +x kwctl-linux-x86_64
         sudo mv kwctl-linux-x86_64 /usr/local/bin/kwctl
 
-
-    - name: Run test cases
+    - name: Test policy
       run: |
-        for test_case in tests/*.json; do
-          echo "Running $test_case"
-          settings=$(jq -c '.settings' "$test_case")
-          request=$(jq -c '.request' "$test_case")
-          expect_rejection=$(jq -r '.expect_rejection // false' "$test_case")
-          echo "$request" > tmp-request.json
-
-          if kwctl run --request-path tmp-request.json --settings-json "$settings" ./target/${{ env.RUST_TARGET }}/release/ingressnightmare_policy.wasm > result.json 2>&1; then
-            if [ "$expect_rejection" = "true" ]; then
-              echo "❌ Expected rejection, but policy accepted $test_case"
-              cat result.json
-              exit 1
-            else
-              echo "✅ Accepted as expected: $test_case"
-            fi
-          else
-            if [ "$expect_rejection" = "true" ]; then
-              echo "✅ Rejected as expected: $test_case"
-            else
-              echo "❌ Unexpected rejection for $test_case"
-              cat result.json
-              exit 1
-            fi
-          fi
-        done
+        cargo test

@@ -1,0 +1,26 @@
+{
+  "uid": "002",
+  "kind": {
+    "group": "networking.k8s.io",
+    "version": "v1",
+    "kind": "Ingress"
+  },
+  "operation": "CREATE",
+  "userInfo": {
+    "username": "admin",
+    "groups": ["system:masters"]
+  },
+  "resource": {
+    "group": "networking.k8s.io",
+    "version": "v1",
+    "resource": "ingresses"
+  },
+  "object": {
+    "kind": "Ingress",
+    "metadata": {
+      "annotations": {
+        "nginx.ingress.kubernetes.io/proxy-body-size": "50m"
+      }
+    }
+  }
+}
