@@ -20,9 +20,9 @@ Of these 5 vulnerabilities, the 3 configuration injection issues (CVE-2025-1097,
 
 IngressNightmare takes advantage of the fact that the `ingress-nginx` validating admission webhook can be accessed from inside the cluster by any workload. If an attacker can reach the `ingress-nginx` admission controller, they can exploit the vulnerabilities to inject malicious configuration into the NGINX controller which could spin up a reverse shell process, allowing the attacker to execute arbitrary code in the context of the ingress-nginx controller.
 
-In order to stop them in their tracks, we can utilize the zero-trust model from **SUSE Security**. If we put the `ingress-nginx` pod into Protect mode, we can ensure that it only runs processes which are allowed by our security rules. This means that even if an attacker is able to reach the `ingress-nginx` admission controller, they will not be able to execute arbitrary code in the context of the ingress-nginx controller, because SUSE Security will stop them in their tracks.
+In order to stop them in their tracks, we utilize the zero-trust model from **SUSE Security**. When we put the ingress-nginx pod into Protect mode, we ensure that it only runs processes which are allowed by our security rules. This means that even if an attacker is able to reach the `ingress-nginx` admission controller, they will not be able to execute arbitrary code in the context of the ingress-nginx controller, because SUSE Security will stop them in their tracks.
 
-[Protect mode](assets/security-protect-mode.png)
+![Protect mode](assets/security-protect-mode.png)
 
 As long as that there's no rule allowing the execution of a shell process inside the `ingress-nginx` pod, the attacker will be stopped in their tracks. This is because SUSE Security will block any process that is not explicitly allowed by our security rules.
 
@@ -138,11 +138,11 @@ But what if a misconfiguration is already present in your cluster? What if an at
 
 To monitor for this, we can use **SUSE Observability** to detect any misconfigurations in your ingress resources. By monitoring the ingress resources in your cluster, you can detect any unauthorized changes or suspicious activity.
 
-[Monitor example](assets/observability-topology.png)
+![Monitor example](assets/observability-topology.png)
 
 For this we've created a specialized Monitor that can detect any ingress resources with the dangerous annotations. Applying this monitor to your SUSE Observability instance will allow you to detect any ingress resources with the dangerous annotations.
 
-[Monitor example](assets/observability-monitor.png)
+![Monitor example](assets/observability-monitor.png)
 
 The IngressNightmare Monitor can be found [here](https://github.com/hierynomus/ingressnightmare-policy/blob/main/monitor/ingressnightmare-monitor.yaml).
 
@@ -151,7 +151,7 @@ You can apply it to your SUSE Observability instance using the `sts` CLI:
 ```bash
 git clone https://github.com/hierynomus/ingressnightmare-policy
 sts monitor apply -f ingressnightmare-policy/monitor/ingressnightmare-monitor.yaml
-```yaml
+```
 
 ## Conclusion
 
