@@ -1,0 +1,14 @@
+apiVersion: policies.kubewarden.io/v1
+kind: ClusterAdmissionPolicy
+metadata:
+  name: ingressnightmare-blocker
+spec:
+  module: ghcr.io/hierynomus/kw-policies/ingressnightmare-policy:v0.1.0
+  rules:
+    - apiGroups: ["networking.k8s.io"]
+      apiVersions: ["v1"]
+      resources: ["ingresses"]
+      operations: ["CREATE", "UPDATE"]
+  settings:
+    allow_config_snippets: false
+  mode: protect
