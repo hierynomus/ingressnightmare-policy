@@ -1,0 +1,59 @@
+nodes:
+  - _type: MonitorFunction
+    id: -2
+    description: |-
+      IngressNightmare Monitor Function
+    name: IngressNightmare Monitor Function
+    parameters: []
+    identifier: urn:system:default:monitor-function:ingress-nightmare
+    script:
+      _type: ScriptFunctionBody
+      scriptBody: |-
+        TopologyStream.query('label = "stackpack:kubernetes" and type = "ingress"')
+        .withSynchronizationData()
+        .then { ingressComponent ->
+            def vulnerableAnnotations = [];
+            def configInjectionAnnotations = [];
+            ingressComponent?.synchronizationData.ingress.forEach { ingress ->
+                def annotations = ingress.sourceProperties.metadata.annotations;
+                ["nginx.ingress.kubernetes.io/auth-url", "nginx.ingress.kubernetes.io/auth-tls-match-cn", "nginx.ingress.kubernetes.io/mirror-target", "nginx.ingress.kubernetes.io/mirror-host"].each { annotation ->
+                    if (annotations[annotation]) {
+                        vulnerableAnnotations.add(annotation);
+                    }
+                }
+                ["nginx.ingress.kubernetes.io/configuration-snippet",
+                    "nginx.ingress.kubernetes.io/server-snippet",
+                    "nginx.ingress.kubernetes.io/auth-snippet"].each { annotation ->
+                    if (annotations[annotation]) {
+                        configInjectionAnnotations.add(annotation);
+                    }
+                }
+            }
+
+            String urn = ingressComponent.identifiers.toSorted().head();
+            remediationHintTemplateData = [:];
+            remediationHintTemplateData["vulnerableAnnotations"] = vulnerableAnnotations;
+            remediationHintTemplateData["componentUrnForUrl"] = URLEncoder.encode(urn, "UTF-8");
+
+            if (vulnerableAnnotations.size() > 0) {
+                return [ _type: "MonitorHealthState", id: urn, state: "CRITICAL", message: "Potential IngressNightmare detected", topologyIdentifier: urn, remediationHintTemplateData: remediationHintTemplateData ];
+            } else {
+                return [ _type: "MonitorHealthState", id: urn, state: "CLEAR", message: "No vulnerable annotations found", topologyIdentifier: urn, remediationHintTemplateData: remediationHintTemplateData ];
+            }
+        }
+  - _type: Monitor
+    name: IngressNightmare Monitor
+    identifier: urn:system:default:monitor:ingress-nightmare
+    function: -2
+    arguments: []
+    intervalSeconds: 30
+    remediationHint: |-
+      ## Warning
+      SUSE Observability has detected a potential IngressNightmare vulnerability in your cluster. This vulnerability can be exploited by an attacker to gain access to sensitive information or perform unauthorized actions.
+
+      ## Remediation
+      To remediate this issue, you should remove the vulnerable annotations from the Ingress resource.
+
+    status: ENABLED
+    tags:
+      - ingress

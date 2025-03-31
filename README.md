@@ -1,4 +1,4 @@
-# ingress-snippet-blocker
+# ingressnightmare-blocker
 
 KubeWarden policy that blocks dangerous `ingress-nginx` annotations associated with CVE-2025-1974.
 

@@ -4,7 +4,7 @@
 
 In March 2025, Wiz researchers disclosed a set of critical vulnerabilities in the popular `ingress-nginx` controller for Kubernetes. Collectively referred to as **IngressNightmare**, these issues (CVE-2025-1097, CVE-2025-1098, CVE-2025-24513, CVE-2025-24514, and CVE-2025-1974) allow unauthenticated attackers to exploit the Ingress admission controller, potentially achieving remote code execution or escalating privileges in the cluster.
 
-In this post, we’ll walk through how SUSE’s security stack—including **NeuVector**, **KubeWarden**, and the **Application Collection**—can be layered to mitigate both external and internal risks related to this vulnerability.
+In this post, we’ll walk through how SUSE’s security stack—including **NeuVector**, **KubeWarden**, and the **Application Collection**—can be layered to mitigate both external and internal risks related to this vulnerability. Furthermore we'll add **SUSE Observability** to ensure that no misconfigurations are present in your ingress resources.
 
 But first let's recap the IngressNightmare attack chain.
 
@@ -16,55 +16,17 @@ But first let's recap the IngressNightmare attack chain.
 
 Of these 5 vulnerabilities, the 3 configuration injection issues (CVE-2025-1097, CVE-2025-1098, and CVE-2025-24514) can be used as a trampoline to exploit the RCE vulnerability (CVE-2025-1974). This is because the `auth-tls-match-cn`, `mirror-target`, `mirror-host`, and `auth-url` annotations can be used to inject arbitrary configuration into the NGINX controller, which can then be leveraged to execute arbitrary code.
 
-## Network-Level Defense with SUSE Security
+## First line of defense with SUSE Security
 
-IngressNightmare takes advantage of the fact that the `ingress-nginx` validating admission webhook can sometimes be exposed—intentionally or accidentally—outside the cluster. Once accessible, it can be invoked directly without authentication, bypassing Kubernetes RBAC.
+IngressNightmare takes advantage of the fact that the `ingress-nginx` validating admission webhook can be accessed from inside the cluster by any workload. If an attacker can reach the `ingress-nginx` admission controller, they can exploit the vulnerabilities to inject malicious configuration into the NGINX controller which could spin up a reverse shell process, allowing the attacker to execute arbitrary code in the context of the ingress-nginx controller.
 
-With **SUSE Security**, security teams can apply **network policies** to ensure that only the Kubernetes API server can access the `ingress-nginx-admission` service. This effectively blocks external actors—and even internal pods—from reaching the vulnerable webhook endpoint.
+In order to stop them in their tracks, we can utilize the zero-trust model from **SUSE Security**. If we put the `ingress-nginx` pod into Protect mode, we can ensure that it only runs processes which are allowed by our security rules. This means that even if an attacker is able to reach the `ingress-nginx` admission controller, they will not be able to execute arbitrary code in the context of the ingress-nginx controller, because SUSE Security will stop them in their tracks.
 
-Using SUSE Security's deep packet inspection and container-aware firewalls, you can:
+[Protect mode](assets/security-protect-mode.png)
 
-- Block all external access to the admission controller
-- Enforce that only the API server has access to webhook ports
-- Monitor and alert on any lateral movement attempts
+As long as that there's no rule allowing the execution of a shell process inside the `ingress-nginx` pod, the attacker will be stopped in their tracks. This is because SUSE Security will block any process that is not explicitly allowed by our security rules.
 
-This protects against unauthenticated attacks originating from outside the cluster.
-
-To demonstrate how SUSE Security can be used to secure the admission controller, we need to create a NeuVector security rule that restricts access to the `ingress-nginx-controller-admission` service. This rule should ensure that only the Kubernetes API server can access the webhook, effectively blocking any unauthorized access. Let's investigate how the admission controller is exposed.
-
-The `ingress-nginx` Admission Controller is exposed through a Kubernetes Service of type `ClusterIP`, which means it is only accessible from within the cluster. However, if the service is misconfigured or exposed through a `LoadBalancer` or `NodePort`, it could be accessed from outside the cluster. The Service exposes the webhook on port 443, which is linked to port 8443 on the `ingress-nginx-controller` pod. So to secure the admission controller, we need to ensure that only the Kubernetes API server can access the `ingress-nginx-controller-admission` service on port 443.
-
-Here is an excerpt from the SUSE Security Security Rule that restricts access to the `ingress-nginx-controller-admission` service, allowing only traffic from the Kubernetes API server:
-
-```yaml
-ingress:
-  - action: deny
-  applications:
-  - any
-  name: ingress-nginx-ingress-2
-  ports: tcp/8443
-  priority: 0
-  selector:
-    comment: ""
-    criteria:
-    - key: namespace
-      op: '!='
-      value: kube-system
-    name: not-kube-system
-target:
-  policymode: N/A
-  selector:
-    comment: The Ingress-Nginx service
-    criteria:
-    - key: service
-      op: =
-      value: ingress-nginx*
-    name: ingress-nginx
-```
-
-This would block any access on port 8443 to the `ingress-nginx-controller-admission` service from any namespace other than `kube-system`. Ensuring that the Kubernetes API server is the only entity that can communicate with the `ingress-nginx` admission webhook. Any other pod or external entity will be denied at the network layer. This policy will effectively ensure that CVE-2025-1974 cannot be exploited from outside or inside the cluster.
-
-The full NeuVector security rule set can be found [here](https://github.com/hierynomus/ingressnightmare-policy/blob/main/nvsecurityrule.yaml)
+This is a great first line of defense against the IngressNightmare vulnerabilities, and will prevent the RCE vulnerability from being exploited.
 
 ## Protecting Against Supply Chain Compromise
 
@@ -108,6 +70,13 @@ Next to that, if configured, it can also block the following annotations that ar
 - `nginx.ingress.kubernetes.io/configuration-snippet`
 - `nginx.ingress.kubernetes.io/server-snippet`
 - `nginx.ingress.kubernetes.io/auth-snippet`
+
+Once this policy is applied, trying to create an Ingress resource with any of the above annotations will result in a rejection:
+
+```bash
+kubectl apply -f ingress-nightmare.yaml
+Error from server: error when creating "ingress-nightmare.yaml": admission webhook "clusterwide-ingressnightmare-blocker.kubewarden.admission" denied the request: Blocked dangerous ingress annotation: nginx.ingress.kubernetes.io/auth-url
+```
 
 By positioning KubeWarden’s admission webhook to run before others (lexicographically), platform teams can block dangerous Ingress objects before they ever reach the vulnerable ingress-nginx admission webhook.
 
@@ -161,16 +130,42 @@ To further reduce the risk of supply chain-based attacks, SUSE provides the [**A
 
 When combined with NeuVector and KubeWarden, the Application Collection ensures that what you deploy is what you expect, no tampering, no surprises.
 
+## Checking for Misconfigurations with SUSE Observability
+
+SUSE Security can block the RCE attack once its occurring. KubeWarden can block the creation or update of Ingress resources with dangerous annotations, preventing the exploitation of CVE-2025-1097, CVE-2025-1098, and CVE-2025-24514. The Application Collection can ensure that only trusted workloads are deployed in the first place.
+
+But what if a misconfiguration is already present in your cluster? What if an attacker has already deployed a malicious Ingress resource?
+
+To monitor for this, we can use **SUSE Observability** to detect any misconfigurations in your ingress resources. By monitoring the ingress resources in your cluster, you can detect any unauthorized changes or suspicious activity.
+
+[Monitor example](assets/observability-topology.png)
+
+For this we've created a specialized Monitor that can detect any ingress resources with the dangerous annotations. Applying this monitor to your SUSE Observability instance will allow you to detect any ingress resources with the dangerous annotations.
+
+[Monitor example](assets/observability-monitor.png)
+
+The IngressNightmare Monitor can be found [here](https://github.com/hierynomus/ingressnightmare-policy/blob/main/monitor/ingressnightmare-monitor.yaml).
+
+You can apply it to your SUSE Observability instance using the `sts` CLI:
+
+```bash
+git clone https://github.com/hierynomus/ingressnightmare-policy
+sts monitor apply -f ingressnightmare-policy/monitor/ingressnightmare-monitor.yaml
+```yaml
+
 ## Conclusion
 
-IngressNightmare is a wake-up call for defense-in-depth. With SUSE's Open Source Kubernetes security stack, teams can:
+IngressNightmare is a wake-up call for defense-in-depth. With SUSE's Open Source Kubernetes security and observability stack, teams can:
 
-- Prevent unauthorized network access with **SUSE Security**
+- Prevent unauthorized process execution with **SUSE Security**
 - Block unsafe resources at the API level with **KubeWarden**
 - Deploy only trusted workloads from a verified supply chain using the **Application Collection**
+- Monitor any ingress resources to detect misconfigurations with **SUSE Observability**
 
 By combining these tools, platform engineers and security teams gain visibility, control, and peace of mind.
 
-To learn more, visit [KubeWarden](https://kubewarden.io) and [SUSE Security](https://www.suse.com/products/rancher/security/).
+Of course none of these tools are a silver bullet, the best way to prevent IngressNightmare is to upgrade your ingress-nginx controller to the latest version.
+
+To learn more, visit [KubeWarden](https://kubewarden.io), [SUSE Security](https://www.suse.com/products/rancher/security/), [SUSE Observability](https://www.suse.com/products/rancher/observability/) and [Application Collection](https://apps.rancher.io).
 
 _Stay secure. Stay ahead._
