@@ -74,46 +74,11 @@ Next to that, if configured, it can also block the following annotations that ar
 Once this policy is applied, trying to create an Ingress resource with any of the above annotations will result in a rejection:
 
 ```bash
-kubectl apply -f ingress-nightmare.yaml
+> kubectl apply -f ingress-nightmare.yaml
 Error from server: error when creating "ingress-nightmare.yaml": admission webhook "clusterwide-ingressnightmare-blocker.kubewarden.admission" denied the request: Blocked dangerous ingress annotation: nginx.ingress.kubernetes.io/auth-url
 ```
 
-By positioning KubeWarden’s admission webhook to run before others (lexicographically), platform teams can block dangerous Ingress objects before they ever reach the vulnerable ingress-nginx admission webhook.
-
-To do this, ensure KubeWarden's `ValidatingWebhookConfiguration` is named to sort alphabetically before other admission webhooks. For example `00-kubewarden-ingress-blocker`.
-
-Additionally, configure the webhook with a `failurePolicy: Fail` to guarantee that any issues with policy evaluation result in a denial of the request. Below is a complete example of a `ValidatingWebhookConfiguration` resource tailored to enforce the KubeWarden ingress policy early:
-
-```yaml
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  name: 00-kubewarden-ingress-blocker
-webhooks:
-  - name: ingress.kubewarden.io
-    clientConfig:
-      service:
-        name: kubewarden-policy-server
-        namespace: kubewarden
-        path: "/validate"
-        port: 443
-      caBundle: <Base64-encoded-CA-bundle>
-    rules:
-      - apiGroups: ["networking.k8s.io"]
-        apiVersions: ["v1"]
-        operations: ["CREATE", "UPDATE"]
-        resources: ["ingresses"]
-        scope: "Namespaced"
-    admissionReviewVersions: ["v1"]
-    sideEffects: None
-    failurePolicy: Fail
-    matchPolicy: Exact
-    timeoutSeconds: 10
-```
-
-Replace `<Base64-encoded-CA-bundle>` with the appropriate CA bundle for your policy server’s TLS certificate.
-
-This configuration ensures KubeWarden receives and evaluates Ingress resources before any other admission webhook, and any policy failure results in a rejection of the ingress resource. This effectively blocks the exploitation of CVE-2025-1097, CVE-2025-1098, and CVE-2025-24514.
+This policy ensures KubeWarden receives and evaluates Ingress resources, and any policy failure results in a rejection of the ingress resource. This effectively blocks the exploitation of CVE-2025-1097, CVE-2025-1098, and CVE-2025-24514.
 
 So far, we have secured the network layer with NeuVector and the API layer with KubeWarden. But SUSE also offers a way to secure the software supply chain.
 
